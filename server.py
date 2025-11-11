@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# TOTO JE DÍLO MICHALA SCHNEIDERA
+# VÍCE INFORMACÍ NALEZNETE V README.MD
 """
 Local Network Hub Server
 Real-time chat and file sharing for local network
