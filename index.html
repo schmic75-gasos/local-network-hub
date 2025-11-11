@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Domácí Hub - Lokální Síť</title>
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --gradient-start: #ffdae3ff;
+            --gradient-mid: #abc8a5ff;
+            --gradient-end: #c7c7e5ff;
+            --primary: #c46a5dff;
+            --primary-light: #b19cd9;
+            --text-dark: #2c3e50;
+            --text-light: #7f8c8d;
+            --white: #ffffff;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --shadow-hover: rgba(0, 0, 0, 0.15);
+            --border: #e8e8e8;
+            --success: #27ae60;
+            --danger: #e74c3c;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, var(--gradient-end) 0%, var(--gradient-start) 50%, var(--gradient-mid) 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: var(--text-dark);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: fadeInDown 0.6s ease;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            color: black;
+            text-shadow: 2px 2px 4px var(--shadow);
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: black;
+            opacity: 0.9;
+        }
+
+        .hub-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 30px;
+            animation: fadeInUp 0.6s ease;
+        }
+
+        .hub-card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 8px 24px var(--shadow);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hub-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .hub-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 32px var(--shadow-hover);
+        }
+
+        .hub-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .hub-card-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        .hub-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+            color: var(--text-dark);
+        }
+
+        .hub-card p {
+            color: var(--text-light);
+            line-height: 1.6;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: var(--white);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 20px 30px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: var(--white);
+        }
+
+        .modal-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--white);
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-body {
+            padding: 30px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        /* Chat Styles */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+        }
+
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .chat-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--white);
+            font-weight: 600;
+            font-size: 1.2rem;
+        }
+
+        .chat-info h3 {
+            font-size: 1.1rem;
+            margin-bottom: 2px;
+        }
+
+        .chat-status {
+            font-size: 0.85rem;
+            color: var(--success);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message {
+            display: flex;
+            gap: 8px;
+            animation: messageSlide 0.3s ease;
+        }
+
+        .message.sent {
+            flex-direction: row-reverse;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            position: relative;
+        }
+
+        .message.received .message-content {
+            background: #f0f0f0;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.sent .message-content {
+            background: var(--primary);
+            color: var(--white);
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-time {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 12px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .chat-input:focus {
+            border-color: var(--primary);
+        }
+
+        .send-btn {
+            padding: 12px 24px;
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            border-radius: 24px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .send-btn:hover {
+            background: var(--primary-light);
+            transform: scale(1.05);
+        }
+
+        /* File Manager Styles */
+        .file-manager {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .file-upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-upload-area:hover {
+            border-color: var(--primary);
+            background: rgba(155, 89, 182, 0.05);
+        }
+
+        .file-upload-area input {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .file-item:hover {
+            background: #e9ecef;
+            transform: translateX(4px);
+        }
+
+        .file-icon {
+            font-size: 2rem;
+        }
+
+        .file-info {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .file-meta {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .file-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .file-btn.download {
+            background: var(--primary);
+            color: var(--white);
+        }
+
+        .file-btn.delete {
+            background: var(--danger);
+            color: var(--white);
+        }
+
+        .file-btn:hover {
+            opacity: 0.8;
+            transform: scale(1.05);
+        }
+
+        /* Notes Styles */
+        .notes-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 16px;
+        }
+
+        .note-card {
+            background: linear-gradient(135deg, #fff9c4, #fff59d);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px var(--shadow);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .note-card:nth-child(2n) {
+            background: linear-gradient(135deg, #e1bee7, #ce93d8);
+        }
+
+        .note-card:nth-child(3n) {
+            background: linear-gradient(135deg, #b2dfdb, #80cbc4);
+        }
+
+        .note-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px var(--shadow-hover);
+        }
+
+        .note-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+
+        .note-content {
+            font-size: 0.9rem;
+            line-height: 1.5;
+            opacity: 0.9;
+        }
+
+        .note-time {
+            font-size: 0.75rem;
+            margin-top: 12px;
+            opacity: 0.7;
+        }
+
+        .add-note-btn {
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            transition: all 0.2s ease;
+        }
+
+        .add-note-btn:hover {
+            background: var(--primary-light);
+            transform: scale(1.05);
+        }
+
+        /* Calendar Styles */
+        .calendar-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .calendar-nav {
+            display: flex;
+            gap: 12px;
+        }
+
+        .calendar-nav button {
+            padding: 8px 16px;
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .calendar-nav button:hover {
+            background: var(--primary-light);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .calendar-day-header {
+            text-align: center;
+            font-weight: 600;
+            padding: 12px;
+            color: var(--text-light);
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #f8f9fa;
+        }
+
+        .calendar-day:hover {
+            background: var(--primary-light);
+            color: var(--white);
+        }
+
+        .calendar-day.today {
+            background: var(--primary);
+            color: var(--white);
+            font-weight: 600;
+        }
+
+        .calendar-day.other-month {
+            opacity: 0.3;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* GIF picker and markdown preview styles */
+        .chat-toolbar {
+            display: flex;
+            gap: 8px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 8px;
+        }
+
+        .toolbar-btn {
+            padding: 6px 12px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .toolbar-btn:hover {
+            background: var(--primary-light);
+            color: var(--white);
+        }
+
+        .toolbar-btn.active {
+            background: var(--primary);
+            color: var(--white);
+        }
+
+        .gif-picker {
+            display: none;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .gif-picker.active {
+            display: block;
+        }
+
+        .gif-search {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .gif-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .gif-item {
+            aspect-ratio: 1;
+            background: #e0e0e0;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            transition: transform 0.2s ease;
+        }
+
+        .gif-item:hover {
+            transform: scale(1.05);
+        }
+
+        .message-gif {
+            max-width: 300px;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+
+        .markdown-preview {
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .typing-indicator {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            font-style: italic;
+            padding: 4px 0;
+            min-height: 20px;
+        }
+
+        .connection-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .connection-status.connected {
+            background: var(--success);
+        }
+
+        .connection-status.disconnected {
+            background: var(--danger);
+        }
+
+        /* Enhanced file upload area with progress */
+        .upload-progress {
+            margin-top: 12px;
+            display: none;
+        }
+
+        .upload-progress.active {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 4px;
+            text-align: center;
+        }
+
+        .file-item.uploading {
+            opacity: 0.6;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+            .hub-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .modal-content {
+                max-width: 100%;
+                max-height: 100vh;
+                border-radius: 0;
+            }
+
+            .notes-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Clock Widget */
+        .clock-widget {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 8px 24px var(--shadow);
+            margin-bottom: 30px;
+            animation: fadeInUp 0.6s ease 0.2s both;
+        }
+
+        .clock-time {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .clock-date {
+            font-size: 1.2rem;
+            color: var(--text-light);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏫 Domácí Hub</h1>
+            <p class="subtitle">Naše lokální síťové centrum</p>
+            <p class="subtitle">Powered by Raspberry Pi 5 with 8GB of RAM</p>
+            <h3><b><a href="/api/vypnoutsvetlo">VYPNOUT SVĚTLO</a></b></h3>
+            <h3><b><a href="/api/zapnoutsvetlo">ZAPNOUT SVĚTLO</a></b></h3>
+            <h3><b><a href="/api/minutaon">ZAPNOUT SVĚTLO NA JEDNU MINUTU</a></b></h3>
+ <h3><b><a href="http://raspberrypi.local:5000/">POKROČILÝ SPRÁVCE SVĚTEL</a></b></h3><br>
+<h3><b><a href="http://raspberrypi.local:2002/api/startradio">PUSTIT RÁDIO NA REPRODUKTORU</a></b></h3>
+<h3><b><a href="http://raspberrypi.local:2002/api/stopradio">UKONČIT RÁDIO NA REPRODUKTORU</a></b></h3>
+
+        </header>
+
+        <div class="clock-widget">
+            <div class="clock-time" id="clock">00:00:00</div>
+            <div class="clock-date" id="date">Načítání...</div><br>
+            <p id="next-lesson"></p>
+            <p id="rokel"></p>
+            <h5>PROPOJENO S <a href="https://gasos.edupage.org/">EDUPAGE</a></h5>
+        </div>
+
+        <div class="hub-grid">
+            <div class="hub-card" onclick="openModal('chat')">
+                <div class="hub-card-icon">💬</div>
+                <h3>Chat</h3>
+                <p>Komunikujte s ostatními v lokální síti v reálném čase</p>
+            </div>
+
+            <div class="hub-card" onclick="openModal('files')">
+                <div class="hub-card-icon">📁</div>
+                <h3>Sdílené Soubory</h3>
+                <p>Sdílejte a spravujte soubory v rámci Domácí sítě</p>
+            </div>
+
+            <div class="hub-card" onclick="openModal('notes')">
+                <div class="hub-card-icon">📝</div>
+                <h3>Poznámky <b>ZATÍM JEN LOKÁLNĚ!!!</b></h3>
+                <p><s>Společné</s> poznámky a připomínky pro celou domácnost</p>
+            </div>
+
+            <div class="hub-card" onclick="openModal('calendar')">
+                <div class="hub-card-icon">📅</div>
+                <h3>Kalendář</h3>
+                <p>Domácí kalendář s důležitými událostmi</p>
+            </div>
+
+            <div class="hub-card" onclick="openModal('tasks')">
+                <div class="hub-card-icon">✅</div>
+                <h3>Úkoly</h3>
+                <p>Společný seznam úkolů a povinností</p>
+            </div>
+
+            <div class="hub-card" onclick="openModal('media')">
+                <div class="hub-card-icon">🎬</div>
+                <h3>Média</h3>
+                <p>Filmy a seriály z celého světa zdarma na jednom místě</p>
+                
+            </div>
+        </div>
+    </div>
+
+     Chat Modal 
+    <div id="chatModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>💬 Domácí Chat</h2>
+                <button class="close-btn" onclick="closeModal('chat')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <div class="chat-avatar">R</div>
+                        <div class="chat-info">
+                            <h3>Domácí Místnost</h3>
+                            <div class="chat-status">
+                                <span class="connection-status" id="connectionStatus"></span>
+                                <span id="statusText">Připojování...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-toolbar">
+                        <button class="toolbar-btn" id="markdownBtn" onclick="toggleMarkdown()">📝 Markdown</button>
+                        <button class="toolbar-btn" id="gifBtn" onclick="toggleGifPicker()">🎬 GIF</button>
+                        <button class="toolbar-btn" onclick="clearChat()">🗑️ Vymazat chat</button>
+                    </div>
+                    <div class="gif-picker" id="gifPicker">
+                        <input type="text" class="gif-search" placeholder="Hledat GIF..." id="gifSearch">
+                        <div class="gif-grid" id="gifGrid">
+                             Popular GIF placeholders 
+                            <div class="gif-item" onclick="sendGif('👍')">👍</div>
+                            <div class="gif-item" onclick="sendGif('❤️')">❤️</div>
+                            <div class="gif-item" onclick="sendGif('😂')">😂</div>
+                            <div class="gif-item" onclick="sendGif('🎉')">🎉</div>
+                            <div class="gif-item" onclick="sendGif('👏')">👏</div>
+                            <div class="gif-item" onclick="sendGif('🔥')">🔥</div>
+                        </div>
+                    </div>
+                    <div class="markdown-preview" id="markdownPreview" style="display: none;"></div>
+                    <div class="typing-indicator" id="typingIndicator"></div>
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message received">
+                            <div class="message-content">
+                                <div>Ahoj všichni! 👋</div>
+                                <div class="message-time">10:30</div>
+                            </div>
+                        </div>
+                        <div class="message sent">
+                            <div class="message-content">
+                                <div>Zdravím! Jak se máte?</div>
+                                <div class="message-time">10:32</div>
+                            </div>
+                        </div>
+                        <div class="message received">
+                            <div class="message-content">
+                                <div>Skvěle! Dnes večer vaříme pizzu 🍕</div>
+                                <div class="message-time">10:35</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-container">
+                        <input type="text" class="chat-input" id="chatInput" placeholder="Napište zprávu...">
+                        <button class="send-btn" onclick="sendMessage()">Odeslat</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+     Files Modal 
+    <div id="filesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📁 Sdílené Soubory</h2>
+                <button class="close-btn" onclick="closeModal('files')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="file-manager">
+                    <div class="file-upload-area" id="fileUploadArea" onclick="document.getElementById('fileInput').click()">
+                        <div class="upload-icon">📤</div>
+                        <h3>Přetáhněte soubory sem</h3>
+                        <p>nebo klikněte pro výběr</p>
+                        <input type="file" id="fileInput" multiple onchange="handleFileUpload(event)">
+                    </div>
+                    <div class="upload-progress" id="uploadProgress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">Nahrávání...</div>
+                    </div>
+                    <div class="file-list" id="fileList">
+                        <div class="file-item">
+                            <div class="file-icon">📄</div>
+                            <div class="file-info">
+                                <div class="file-name">Domácí_foto_2024.jpg</div>
+                                <div class="file-meta">2.4 MB • Dnes v 14:30</div>
+                            </div>
+                            <div class="file-actions">
+                                <button class="file-btn download">Stáhnout</button>
+                                <button class="file-btn delete">Smazat</button>
+                            </div>
+                        </div>
+                        <div class="file-item">
+                            <div class="file-icon">📊</div>
+                            <div class="file-info">
+                                <div class="file-name">Rozpočet_2024.xlsx</div>
+                                <div class="file-meta">156 KB • Včera v 09:15</div>
+                            </div>
+                            <div class="file-actions">
+                                <button class="file-btn download">Stáhnout</button>
+                                <button class="file-btn delete">Smazat</button>
+                            </div>
+                        </div>
+                        <div class="file-item">
+                            <div class="file-icon">🎵</div>
+                            <div class="file-info">
+                                <div class="file-name">Oblíbená_hudba.mp3</div>
+                                <div class="file-meta">5.8 MB • 2 dny zpět</div>
+                            </div>
+                            <div class="file-actions">
+                                <button class="file-btn download">Stáhnout</button>
+                                <button class="file-btn delete">Smazat</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+     Notes Modal 
+    <div id="notesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📝 Poznámky</h2>
+                <button class="close-btn" onclick="closeModal('notes')">×</button>
+            </div>
+            <div class="modal-body">
+                <button class="add-note-btn" onclick="addNote()">+ Nová Poznámka</button>
+                <div class="notes-container" id="notesContainer">
+                    <div class="note-card">
+                        <div class="note-title">Nákupní seznam</div>
+                        <div class="note-content">Mléko, chléb, máslo, vejce, rajčata, okurky</div>
+                        <div class="note-time">Dnes v 08:00</div>
+                    </div>
+                    <div class="note-card">
+                        <div class="note-title">Důležité termíny</div>
+                        <div class="note-content">15.1. - Schůzka u lékaře<br>20.1. - Narozeniny babičky</div>
+                        <div class="note-time">Včera v 18:30</div>
+                    </div>
+                    <div class="note-card">
+                        <div class="note-title">Hesla WiFi</div>
+                        <div class="note-content">Hlavní síť: DomacíSíť2024<br>Hosté: Host_WiFi_123</div>
+                        <div class="note-time">3 dny zpět</div>
+                    </div>
+                    <div class="note-card">
+                        <div class="note-title">Recept na pizzu</div>
+                        <div class="note-content">Mouka 500g, voda 300ml, droždí, sůl, olivový olej...</div>
+                        <div class="note-time">Minulý týden</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+     Calendar Modal 
+    <div id="calendarModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📅 Domácí Kalendář</h2>
+                <button class="close-btn" onclick="closeModal('calendar')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="calendar-container">
+                    <div class="calendar-header">
+                        <h3 id="calendarMonth">Leden 2024</h3>
+                        <div class="calendar-nav">
+                            <button onclick="previousMonth()">◀ Předchozí</button>
+                            <button onclick="nextMonth()">Další ▶</button>
+                        </div>
+                    </div>
+                    <div class="calendar-grid" id="calendarGrid">
+                         Calendar will be generated by JavaScript 
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+     Tasks Modal 
+    <div id="tasksModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✅ Domácí Úkoly</h2>
+                <button class="close-btn" onclick="closeModal('tasks')">×</button>
+            </div>
+            <div class="modal-body">
+                <button class="add-note-btn" onclick="addTask()">+ Nový Úkol</button>
+                <div class="file-list" id="tasksList">
+                    <div class="file-item">
+                        <input type="checkbox" style="width: 24px; height: 24px; cursor: pointer;">
+                        <div class="file-info">
+                            <div class="file-name">Vynést koš</div>
+                            <div class="file-meta">Přiřazeno: Martin • Term��n: Dnes</div>
+                        </div>
+                    </div>
+                    <div class="file-item">
+                        <input type="checkbox" style="width: 24px; height: 24px; cursor: pointer;">
+                        <div class="file-info">
+                            <div class="file-name">Nakoupit potraviny</div>
+                            <div class="file-meta">Přiřazeno: Jana • Termín: Zítra</div>
+                        </div>
+                    </div>
+                    <div class="file-item">
+                        <input type="checkbox" checked style="width: 24px; height: 24px; cursor: pointer;">
+                        <div class="file-info">
+                            <div class="file-name" style="text-decoration: line-through; opacity: 0.6;">Uklidit obývák</div>
+                            <div class="file-meta">Přiřazeno: Petr • Dokončeno</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+     Media Modal 
+    <div id="mediaModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🎬 Domácí Média</h2>
+                <button class="close-btn" onclick="closeModal('media')">×</button>
+            </div>
+            <div class="modal-body">
+               <iframe src="/netflix"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Clock functionality
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('cs-CZ');
+            const dateString = now.toLocaleDateString('cs-CZ', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            
+            document.getElementById('clock').textContent = timeString;
+            document.getElementById('date').textContent = dateString;
+        }
+
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        // Modal functionality
+        let openModal = function(modalName) {
+            const modal = document.getElementById(modalName + 'Modal');
+            if (modal) {
+                modal.classList.add('active');
+                if (modalName === 'calendar') {
+                    generateCalendar();
+                }
+            }
+        };
+
+        function closeModal(modalName) {
+            const modal = document.getElementById(modalName + 'Modal');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
+
+        // Close modal on outside click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // Chat functionality
+        const SERVER_URL = window.location.origin.replace(/:\d+/, ':2002');
+        let socket = null;
+        let markdownEnabled = false;
+        let md = null;
+        let typingTimeout = null;
+        let currentUsername = localStorage.getItem('username') || 'User' + Math.floor(Math.random() * 1000);
+
+        // Initialize markdown parser
+        if (typeof markdownit !== 'undefined') {
+            md = markdownit({
+                html: false,
+                linkify: true,
+                typographer: true
+            });
+        }
+
+        // Initialize WebSocket connection
+        function initializeChat() {
+            if (typeof io === 'undefined') {
+                console.error('Socket.IO not loaded');
+                return;
+            }
+
+            socket = io(SERVER_URL, {
+                transports: ['websocket', 'polling']
+            });
+
+            socket.on('connect', () => {
+                console.log('[v0] Connected to server');
+                updateConnectionStatus(true);
+                // Request chat history on connect
+                socket.emit('get_chat_history');
+            });
+
+            socket.on('disconnect', () => {
+                console.log('[v0] Disconnected from server');
+                updateConnectionStatus(false);
+            });
+
+            socket.on('chat_history', (messages) => {
+                console.log('[v0] Received chat history:', messages.length, 'messages');
+                displayChatHistory(messages);
+            });
+
+            socket.on('new_message', (message) => {
+                console.log('[v0] New message received:', message);
+                addMessageToChat(message, false);
+            });
+
+            socket.on('user_typing', (data) => {
+                showTypingIndicator(data.username);
+            });
+
+            socket.on('chat_cleared', () => {
+                document.getElementById('chatMessages').innerHTML = '';
+            });
+
+            socket.on('file_uploaded', (file) => {
+                loadFiles();
+            });
+
+            socket.on('file_deleted', (data) => {
+                loadFiles();
+            });
+        }
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            const text = document.getElementById('statusText');
+            if (status && text) {
+                status.className = 'connection-status ' + (connected ? 'connected' : 'disconnected');
+                text.textContent = connected ? 'Online' : 'Offline';
+            }
+        }
+
+        function displayChatHistory(messages) {
+            const container = document.getElementById('chatMessages');
+            container.innerHTML = '';
+            messages.forEach(msg => addMessageToChat(msg, true));
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addMessageToChat(message, isHistory) {
+            const container = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            const isOwn = message.username === currentUsername;
+            messageDiv.className = 'message ' + (isOwn ? 'sent' : 'received');
+            
+            let content = message.text;
+            if (message.type === 'markdown' && md) {
+                content = md.render(message.text);
+            } else {
+                content = escapeHtml(message.text);
+            }
+
+            let gifHtml = '';
+            if (message.gif_url) {
+                gifHtml = `<div class="message-gif">${message.gif_url}</div>`;
+            }
+
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    ${!isOwn ? `<div style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 4px;">${escapeHtml(message.username)}</div>` : ''}
+                    <div>${content}</div>
+                    ${gifHtml}
+                    <div class="message-time">${message.timestamp}</div>
+                </div>
+            `;
+            
+            container.appendChild(messageDiv);
+            if (!isHistory) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (message && socket) {
+                socket.emit('send_message', {
+                    text: message,
+                    username: currentUsername,
+                    type: markdownEnabled ? 'markdown' : 'text'
+                });
+                input.value = '';
+                updateMarkdownPreview('');
+                toggleMarkdown(); // Turn off markdown after sending
+            }
+        }
+
+        function sendGif(emoji) {
+            if (socket) {
+                socket.emit('send_message', {
+                    text: '',
+                    username: currentUsername,
+                    type: 'gif',
+                    gif_url: emoji
+                });
+                toggleGifPicker();
+            }
+        }
+
+        function toggleMarkdown() {
+            markdownEnabled = !markdownEnabled;
+            const btn = document.getElementById('markdownBtn');
+            const preview = document.getElementById('markdownPreview');
+            
+            if (markdownEnabled) {
+                btn.classList.add('active');
+                preview.style.display = 'block';
+                updateMarkdownPreview(document.getElementById('chatInput').value);
+            } else {
+                btn.classList.remove('active');
+                preview.style.display = 'none';
+            }
+        }
+
+        function toggleGifPicker() {
+            const picker = document.getElementById('gifPicker');
+            const btn = document.getElementById('gifBtn');
+            
+            if (picker.classList.contains('active')) {
+                picker.classList.remove('active');
+                btn.classList.remove('active');
+            } else {
+                picker.classList.add('active');
+                btn.classList.add('active');
+            }
+        }
+
+        function updateMarkdownPreview(text) {
+            if (markdownEnabled && md) {
+                const preview = document.getElementById('markdownPreview');
+                preview.innerHTML = text ? md.render(text) : '<em>Náhled markdown...</em>';
+            }
+        }
+
+        function showTypingIndicator(username) {
+            const indicator = document.getElementById('typingIndicator');
+            if (username !== currentUsername) {
+                indicator.textContent = `${username} píše...`;
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    indicator.textContent = '';
+                }, 3000);
+            }
+        }
+
+        function clearChat() {
+            if (confirm('Opravdu chcete vymazat celou historii chatu?')) {
+                if (socket) {
+                    socket.emit('clear_chat');
+                }
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function loadFiles() {
+            try {
+                const response = await fetch(`${SERVER_URL}/api/files`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayFiles(data.files);
+                }
+            } catch (error) {
+                console.error('[v0] Error loading files:', error);
+            }
+        }
+
+        function displayFiles(files) {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+            
+            if (files.length === 0) {
+                fileList.innerHTML = '<p style="text-align: center; color: var(--text-light); padding: 20px;">Žádné soubory</p>';
+                return;
+            }
+
+            files.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <div class="file-icon">${file.icon}</div>
+                    <div class="file-info">
+                        <div class="file-name">${escapeHtml(file.name)}</div>
+                        <div class="file-meta">${formatFileSize(file.size)} • ${file.modified}</div>
+                    </div>
+                    <div class="file-actions">
+                        <button class="file-btn download" onclick="downloadFile('${encodeURIComponent(file.name)}')">Stáhnout</button>
+                        <button class="file-btn delete" onclick="deleteFile('${encodeURIComponent(file.name)}')">Smazat</button>
+                    </div>
+                `;
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        async function handleFileUpload(event) {
+            const files = event.target.files;
+            if (files.length === 0) return;
+
+            const progress = document.getElementById('uploadProgress');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const formData = new FormData();
+                formData.append('file', file);
+
+                progress.classList.add('active');
+                progressText.textContent = `Nahrávání ${file.name}... (${i + 1}/${files.length})`;
+                progressFill.style.width = '0%'; // Reset progress for each file
+
+                try {
+                    const response = await fetch(`${SERVER_URL}/api/files/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        // Update progress for the current file (simplified)
+                        progressFill.style.width = ((i + 1) / files.length * 100) + '%';
+                    } else {
+                        alert(`Chyba při nahrávání souboru ${file.name}: ${data.message}`);
+                    }
+                } catch (error) {
+                    console.error('[v0] Error uploading file:', error);
+                    alert(`Chyba při nahrávání souboru ${file.name}`);
+                    progressFill.style.width = '0%'; // Reset on error
+                }
+            }
+
+            setTimeout(() => {
+                progress.classList.remove('active');
+                progressFill.style.width = '0%';
+                document.getElementById('fileInput').value = ''; // Clear the input
+                loadFiles(); // Reload files after upload
+            }, 1000);
+        }
+
+        function downloadFile(filename) {
+            window.open(`${SERVER_URL}/api/files/download/${filename}`, '_blank');
+        }
+
+        async function deleteFile(filename) {
+            if (!confirm(`Opravdu chcete smazat soubor "${decodeURIComponent(filename)}"?`)) return;
+
+            try {
+                const response = await fetch(`${SERVER_URL}/api/files/delete/${filename}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    loadFiles();
+                } else {
+                    alert(`Chyba při mazání souboru: ${data.message}`);
+                }
+            } catch (error) {
+                console.error('[v0] Error deleting file:', error);
+                alert('Chyba při mazání souboru');
+            }
+        }
+
+        // Drag and drop support
+        const uploadArea = document.getElementById('fileUploadArea');
+        if (uploadArea) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, () => {
+                    uploadArea.style.borderColor = 'var(--primary)';
+                    uploadArea.style.background = 'rgba(155, 89, 182, 0.1)';
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, () => {
+                    uploadArea.style.borderColor = '';
+                    uploadArea.style.background = '';
+                });
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                document.getElementById('fileInput').files = files;
+                handleFileUpload({ target: { files } });
+            });
+        }
+
+        // Notes functionality
+        function addNote() {
+            const title = prompt('Název poznámky:');
+            if (!title) return;
+            
+            const content = prompt('Obsah poznámky:');
+            if (!content) return;
+            
+            const notesContainer = document.getElementById('notesContainer');
+            const noteCard = document.createElement('div');
+            noteCard.className = 'note-card';
+            
+            const now = new Date().toLocaleString('cs-CZ');
+            
+            noteCard.innerHTML = `
+                <div class="note-title">${title}</div>
+                <div class="note-content">${content}</div>
+                <div class="note-time">${now}</div>
+            `;
+            
+            notesContainer.insertBefore(noteCard, notesContainer.firstChild);
+        }
+
+        // Calendar functionality
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+
+        function generateCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            
+            const monthNames = ['Celoroční aktivity', 'Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen',
+                              'Červenec', 'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec'];
+            
+            document.getElementById('calendarMonth').textContent = `${monthNames[currentMonth]} ${currentYear}`;
+            
+            const dayHeaders = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
+            dayHeaders.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'calendar-day-header';
+                header.textContent = day;
+                grid.appendChild(header);
+            });
+            
+            const firstDay = new Date(currentYear, currentMonth, 1);
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            const startDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // Monday is 0
+            
+            const prevLastDay = new Date(currentYear, currentMonth, 0);
+            for (let i = startDay - 1; i >= 0; i--) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day other-month';
+                day.textContent = prevLastDay.getDate() - i;
+                grid.appendChild(day);
+            }
+            
+            const today = new Date();
+            for (let i = 1; i <= lastDay.getDate(); i++) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day';
+                day.textContent = i;
+                
+                if (i === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear()) {
+                    day.classList.add('today');
+                }
+                
+                grid.appendChild(day);
+            }
+            
+            // Fill remaining cells to make it a 6-week grid if needed
+            let daysInGrid = grid.children.length;
+            for (let i = 1; daysInGrid < 42; i++) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day other-month';
+                day.textContent = i;
+                grid.appendChild(day);
+                daysInGrid++;
+            }
+        }
+
+        function previousMonth() {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            generateCalendar();
+        }
+
+        function nextMonth() {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            generateCalendar();
+        }
+
+        // Tasks functionality
+        function addTask() {
+            const taskName = prompt('Název úkolu:');
+            if (!taskName) return;
+            
+            const assignee = prompt('Přiřazeno komu:');
+            const deadline = prompt('Termín (např. Dnes, Zítra):');
+            
+            const tasksList = document.getElementById('tasksList');
+            const taskItem = document.createElement('div');
+            taskItem.className = 'file-item';
+            
+            taskItem.innerHTML = `
+                <input type="checkbox" style="width: 24px; height: 24px; cursor: pointer;" onchange="toggleTask(this)">
+                <div class="file-info">
+                    <div class="file-name">${escapeHtml(taskName)}</div>
+                    <div class="file-meta">Přiřazeno: ${escapeHtml(assignee) || 'Nikdo'} • Termín: ${escapeHtml(deadline) || 'Neurčeno'}</div>
+                </div>
+            `;
+            
+            tasksList.insertBefore(taskItem, tasksList.firstChild);
+        }
+
+        function toggleTask(checkbox) {
+            const taskName = checkbox.nextElementSibling.querySelector('.file-name');
+            const taskMeta = checkbox.nextElementSibling.querySelector('.file-meta');
+            
+            if (checkbox.checked) {
+                taskName.style.textDecoration = 'line-through';
+                taskName.style.opacity = '0.6';
+                taskMeta.textContent = taskMeta.textContent.split('•')[0] + '• Dokončeno';
+            } else {
+                taskName.style.textDecoration = 'none';
+                taskName.style.opacity = '1';
+            }
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal.active').forEach(modal => {
+                    modal.classList.remove('active');
+                });
+            }
+        });
+
+        // Update markdown preview on input and send typing indicator
+        document.getElementById('chatInput')?.addEventListener('input', (e) => {
+            updateMarkdownPreview(e.target.value);
+            
+            // Send typing indicator
+            if (socket && e.target.value.length > 0) {
+                socket.emit('typing', { username: currentUsername });
+            }
+        });
+
+        // Modified modal open to load data and initialize chat
+        const originalOpenModal = openModal; // Store the original function
+        openModal = function(modalName) {
+            originalOpenModal(modalName); // Call the original function to show the modal
+            if (modalName === 'chat' && !socket) {
+                initializeChat(); // Initialize chat only when the chat modal is opened
+            } else if (modalName === 'files') {
+                loadFiles(); // Load files when the files modal is opened
+            }
+        };
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'pdf': '📄', 'doc': '📄', 'docx': '📄', 'txt': '📄',
+                'xls': '📊', 'xlsx': '📊', 'csv': '📊',
+                'mp3': '🎵', 'wav': '🎵', 'ogg': '🎵',
+                'mp4': '🎬', 'avi': '🎬', 'mkv': '🎬',
+                'zip': '📦', 'rar': '📦', '7z': '📦'
+            };
+            if ( ext.toLowerCase() == 'png' || 'jpg' || 'jpeg' || 'webp' || 'gif' ) {
+                return '<img src="' + filename + '" height="64px" width="64px">'
+            }
+            else {
+            return icons[ext] || '📄';
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        console.log('🏠 Domácí Hub je připraven k použití!');
+        console.log('🌐 Server URL:', SERVER_URL);
+    </script>
+    <script>
+let firstLessonTime = null;
+
+
+fetch("/api/next_lesson")
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      firstLessonTime = data.start_time;  
+      console.log("Začátek první hodiny zítra:", firstLessonTime);
+
+      
+      const el = document.getElementById("next-lesson");
+      if (el) {
+        el.textContent = "První hodina pro první skupinu 1.I zítra začíná v: " + firstLessonTime;
+      }
+    } else {
+      console.log(data.message || data.error);
+    }
+  })
+  .catch(err => console.error("Chyba při načítání hodiny:", err));
+</script>
+<script>
+let rok = null
+    fetch ("/api/schyr")
+    .then(response => response.json())
+    .then(data => {
+    if (data.success) {
+      yr = data.year;  
+      console.log("Aktuální (školní) rok podle Edupage:", yr);
+
+      
+      const elrok = document.getElementById("rokel");
+      if (elrok) {
+        elrok.textContent = "Aktuální (školní) rok podle Edupage: " + yr;
+      }
+    } else {
+      console.log(data.message || data.error);
+    }
+  })
+  .catch(err => console.error("Chyba při načítání hodiny:", err));
+</script>
+
+<div id="next-lesson"></div>
+
+</body>
+</html>
